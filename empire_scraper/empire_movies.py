@@ -120,12 +120,14 @@ class EmpireMovies(object):
         with open(file, 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def save_to_excel(self):
-        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(self.df.columns))
-        self.df.drop(labels=labels, axis=1, inplace=True)
-        file = f'{self.now}_empire_movies.xlsx'
+    def save_to_excel(self, df=None, file=None):
+        if df is None:
+            df = self.df
+            file = f'{self.now}_empire_movies.xlsx'
+        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(df.columns))
+        df.drop(labels=labels, axis=1, inplace=True)
         with open(file, 'wb') as f:
-            self.df.to_excel(f, index=False)
+            df.to_excel(f, index=False)
 
     @staticmethod
     def load_from_pickle(file):
