@@ -1,9 +1,10 @@
 import pandas as pd
-from empire_scraper import EmpireMovies, print_movies
+from empire_scraper import EmpireMovies
+
 
 class LogAnalyzer(object):
     def __init__(self, file):
-        self.file=file
+        self.file = file
         self.columns = ['asctime',
                         'filename',
                         'funcName',
@@ -27,9 +28,9 @@ class LogAnalyzer(object):
 
         print(self.df.pivot_table(index=['levelname'], values=['message1'], aggfunc=[len], margins=True))
         self.df_error = self.df.query('levelname == "ERROR"')
-        solvable_error=[self.analyze_message(message)
-                   for message in self.df_error[['message0', 'message1', 'message2']].values]
-        self.df_error = self.df_error.assign(SolvableError = solvable_error)
+        solvable_error = [self.analyze_message(message)
+                          for message in self.df_error[['message0', 'message1', 'message2']].values]
+        self.df_error = self.df_error.assign(SolvableError=solvable_error)
         self.df_error.to_excel('log_errors.xlsx', index=True)
 
     @staticmethod
@@ -50,6 +51,7 @@ class LogAnalyzer(object):
         solvable_movies = list(self.df_error.query('SolvableError == True')['message2'].unique())
         print(solvable_movies)
         return df[df['InfoReviewUrl'].isin(solvable_movies)]
+
 
 def main():
     df = EmpireMovies.load_from_pickle().get_df()
