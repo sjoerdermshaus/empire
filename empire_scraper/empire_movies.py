@@ -78,7 +78,7 @@ class EmpireMovies(object):
         info_from_article['InfoThumbnail'] = self.get_thumbnail_from_article(article)
         return info_from_article
 
-    def get_movies_for_page(self, page_number):
+    def get_movies_for_page(self, page_number, article_number=None):
         file = 'empire.yaml'
         local_logger = setup_logging(file, f'empire_movies.{page_number}.log')
         info_url = f"https://www.empireonline.com/movies/reviews/{page_number}/"
@@ -99,18 +99,19 @@ class EmpireMovies(object):
         # Loop over all articles
         movies = dict()
         for i, article in enumerate(articles, 1):
-            id = f'{page_number:03d}-{i:02d}'
-            info = dict()
-            info[id] = dict()
-            # Process meta data
-            info[id]['InfoPage'] = page_number
-            info[id]['InfoLocationOnPage'] = i
-            info[id]['InfoUrl'] = info_url
-            info[id].update(self.get_info_from_article(article))
+            if article_number is None or i == article_number:
+                id = f'{page_number:03d}-{i:02d}'
+                info = dict()
+                info[id] = dict()
+                # Process meta data
+                info[id]['InfoPage'] = page_number
+                info[id]['InfoLocationOnPage'] = i
+                info[id]['InfoUrl'] = info_url
+                info[id].update(self.get_info_from_article(article))
 
-            E = EmpireMovie(info, self.process_images)
-            new_movie = E.get_movie()
-            movies.update(new_movie)
+                E = EmpireMovie(info, self.process_images)
+                new_movie = E.get_movie()
+                movies.update(new_movie)
         return movies
 
     def save_to_pickle(self):

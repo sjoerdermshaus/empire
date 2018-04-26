@@ -3,7 +3,7 @@ from empire_scraper import print_movies, setup_logging
 
 import pandas as pd
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 file = 'empire.yaml'
 logger = setup_logging(file)
@@ -21,6 +21,11 @@ def test_movie(review_url):
     info['InfoID']['InfoThumbnail'] = None
     E = EmpireMovie(info)
     print_movies(E.get_movie())
+
+
+def test_specific_movie(page_number, article_number):
+    E = EmpireMovies(process_images=True)
+    print_movies(E.get_movies_for_page(page_number, article_number))
 
 
 def test_page(page_number):
@@ -45,8 +50,9 @@ def test_results():
     df = EmpireMovies.load_from_pickle().get_df()
     df = clean_df(df)
 
-    rating = pd.pivot_table(data=df, index=['Rating'], values=['Movie'], aggfunc=len, margins=True)
-    print(rating)
+    rating = pd.pivot_table(data=df, index=['Rating'], values=['Movie'], aggfunc=len)
+    rating.plot(kind='bar')
+    plt.show()
 
     df_author = pd.pivot_table(data=df, index=['Author'], values=['Rating'], aggfunc=[np.mean, len], margins=True)
     df_author = df_author[df_author[('len', 'Rating')] >= 10]
@@ -80,5 +86,6 @@ if __name__ == '__main__':
     # test_movie(review_url='https://www.empireonline.com/movies/us/review/')
     # test_movie(review_url='https://www.empireonline.com/movies/avengers-infinity-war/review/')
     # test_page(52)
-    test_movies(1, 500, 5)
+    # test_movies(1, 500, 5)
     # test_results()
+    test_specific_movie(93, 1)
