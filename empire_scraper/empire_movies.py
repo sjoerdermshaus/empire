@@ -120,14 +120,14 @@ class EmpireMovies(object):
         with open(file, 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def save_to_excel(self, df=None, file=None):
-        if df is None:
-            df = self.df
-            file = f'{self.now}_empire_movies.xlsx'
+    @staticmethod
+    def save_to_excel(df, file=None, now=None):
+        if file is None: # from object
+            file = f'{now}_empire_movies.xlsx'
         labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(df.columns))
         df.drop(labels=labels, axis=1, inplace=True)
         with open(file, 'wb') as f:
-            df.to_excel(f, index=False)
+            df.to_excel(f, index=True)
 
     @staticmethod
     def load_from_pickle(file):
@@ -138,7 +138,7 @@ class EmpireMovies(object):
         self.df = pd.DataFrame.from_dict(self.movies, orient='index')
         self.df.index.name = 'ID'
         self.save_to_pickle()
-        self.save_to_excel()
+        self.save_to_excel(self.df, file=None, now=self.now)
 
         # df['Essay'] = np.full((len(df), 1), False)
         #         # for tp in df.itertuples():

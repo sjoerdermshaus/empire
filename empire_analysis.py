@@ -35,7 +35,7 @@ def test_page(page):
 
 
 def test_pages(pages, number_of_processors=2):
-    E = EmpireMovies(process_images=False, number_of_processors=number_of_processors)
+    E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
     print_movies(E.get_movies(pages))
 
 
@@ -47,8 +47,8 @@ def clean_df(df):
     return df
 
 
-def test_results():
-    df = EmpireMovies.load_from_pickle().get_df()
+def test_results(file):
+    df = EmpireMovies.load_from_pickle(file).get_df()
     df = clean_df(df)
 
     rating = pd.pivot_table(data=df, index=['Rating'], values=['Movie'], aggfunc=len)
@@ -89,5 +89,5 @@ if __name__ == '__main__':
     # test_page_article(1, 4)
     # test_page_article(93, 1)
     # test_pages(range(1))
-    test_pages(range(1, 500), 8)
+    test_pages(range(1, 501), 5)
     # test_results()
