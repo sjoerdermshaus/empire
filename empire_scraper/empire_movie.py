@@ -40,7 +40,7 @@ class EmpireMovie(object):
     def get_soup(self):
         html = requests_get(self.review_url, max_number_of_attempts=3, timeout=5, proxies=self.proxies)
         if html == -1:
-            logger.error(f'RequestsGetFailed|{self.info_movie}|{self.review_url}')
+            logger.error(f'RequestsGetFailed|{self.info_id}|{self.review_url}')
             self.soup = None
         else:
             self.soup = BeautifulSoup(html, self.parser)
@@ -79,7 +79,7 @@ class EmpireMovie(object):
 
         result = self.soup.find("ul", class_="list__keyline delta txt--mid-grey")
         if result is None:
-            logger.info(f'NoInfoLeft|{self.movie}|{self.review_url}')
+            logger.info(f'NoInfoLeft|{self.info_id}|{self.review_url}')
             return None
 
         result = result.get_text('|').split('|')
@@ -144,7 +144,7 @@ class EmpireMovie(object):
                             movie['Picture']['File'] = Image.open(BytesIO(response.content))
 
     def get_review(self):
-        logger.info(f'GetReview|{self.info_movie.encode("utf-8")}|{self.review_url}')
+        logger.info(f'GetReview|{self.info_id}|{self.review_url}')
         self.get_soup()
         if self.soup is None:
             return

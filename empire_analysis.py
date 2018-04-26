@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 file = 'empire.yaml'
 logger = setup_logging(file)
 
@@ -13,7 +14,7 @@ def test_movie(review_url):
     info = {}
     info['InfoID'] = {}
     info['InfoID']['InfoPage'] = None
-    info['InfoID']['InfoLocationOnPage'] = None
+    info['InfoID']['Article'] = None
     info['InfoID']['InfoMovie'] = 'The Best Ever'
     info['InfoID']['InfoRating'] = 6
     info['InfoID']['InfoReviewUrl'] = review_url
@@ -23,19 +24,19 @@ def test_movie(review_url):
     print_movies(E.get_movie())
 
 
-def test_specific_movie(page_number, article_number):
+def test_page_article(page, article):
     E = EmpireMovies(process_images=True)
-    print_movies(E.get_movies_for_page(page_number, article_number))
+    print_movies(E.get_movies(page, article))
 
 
-def test_page(page_number):
+def test_page(page):
     E = EmpireMovies(process_images=True)
-    print_movies(E.get_movies_for_page(page_number=page_number))
+    print_movies(E.get_movies(page))
 
 
-def test_movies(lb=1, ub=1000, number_of_processors=2):
-    EmpireMovies(lb=lb, ub=ub, process_images=False, number_of_processors=number_of_processors).run()
-    # print_movies(E.get_movies())
+def test_pages(pages, number_of_processors=2):
+    E = EmpireMovies(process_images=False, number_of_processors=number_of_processors)
+    print_movies(E.get_movies(pages))
 
 
 def clean_df(df):
@@ -85,7 +86,8 @@ if __name__ == '__main__':
     # test_movie(review_url='https://www.empireonline.com/movies/mrs-browns-boys-dmovie/review/')
     # test_movie(review_url='https://www.empireonline.com/movies/us/review/')
     # test_movie(review_url='https://www.empireonline.com/movies/avengers-infinity-war/review/')
-    # test_page(52)
-    # test_movies(1, 500, 5)
+    # test_page_article(1, 4)
+    # test_page_article(93, 1)
+    # test_pages(range(1))
+    test_pages(range(1, 500), 8)
     # test_results()
-    test_specific_movie(93, 1)

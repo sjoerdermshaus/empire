@@ -60,7 +60,8 @@ def main():
     L = LogAnalyzer(file)
     df_solvable_movies = L.get_solvable_movies(df)
     for row in df_solvable_movies.itertuples():
-        EmpireMovies().get_movies_for_page(row.InfoPage, row.InfoLocationOnPage)
+        E =  EmpireMovies()
+        E.get_movies_for_page(row.InfoPage, row.InfoLocationOnPage)
 
 
 if __name__ == '__main__':
