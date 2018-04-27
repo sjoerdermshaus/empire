@@ -28,9 +28,11 @@ class EmpireMovies(object):
         if use_proxies:
             self.proxies = get_proxies(file='empire_scraper/proxies.csv')
         self.now = None
+        self.pages = None
+        self.export = None
 
     @staticmethod
-    def get_title_from_article(article):
+    def __get_title_from_article(article):
         title = None
         result = article.find('p', class_='hdr no-marg gamma txt--black pad__top--half')
         if result is not None:
@@ -38,7 +40,7 @@ class EmpireMovies(object):
         return title
 
     @staticmethod
-    def get_review_url_from_article(article):
+    def __get_review_url_from_article(article):
         review_url = None
         result = article.find('a')
         if result is not None:
@@ -46,7 +48,7 @@ class EmpireMovies(object):
         return review_url
 
     @staticmethod
-    def get_rating_from_article(article):
+    def __get_rating_from_article(article):
         rating = None
         result = article.find("span", class_="stars--on")
         if result is not None:
@@ -54,7 +56,7 @@ class EmpireMovies(object):
         return rating
 
     @staticmethod
-    def get_thumbnail_from_article(article):
+    def __get_thumbnail_from_article(article):
         thumbnail = None
         result = article.find('img')
         if result is not None:
@@ -70,15 +72,15 @@ class EmpireMovies(object):
                         thumbnail['File'] = Image.open(BytesIO(response.content))
         return thumbnail
 
-    def get_info_from_article(self, article):
+    def __get_info_from_article(self, article):
         info = dict()
-        info['InfoMovie'] = self.get_title_from_article(article)
-        info['InfoReviewUrl'] = self.get_review_url_from_article(article)
-        info['InfoRating'] = self.get_rating_from_article(article)
-        info['InfoThumbnail'] = self.get_thumbnail_from_article(article)
+        info['InfoMovie'] = self.__get_title_from_article(article)
+        info['InfoReviewUrl'] = self.__get_review_url_from_article(article)
+        info['InfoRating'] = self.__get_rating_from_article(article)
+        info['InfoThumbnail'] = self.__get_thumbnail_from_article(article)
         return info
 
-    def get_movies_for_page(self, page, article_number=None):
+    def _get_movies_for_page(self, page, article_number=None):
         file = 'empire.yaml'
         local_logger = setup_logging(file, f'empire_movies.{page}.log')
         info_url = f"https://www.empireonline.com/movies/reviews/{page}/"
@@ -107,7 +109,7 @@ class EmpireMovies(object):
                 info[info_id]['InfoPage'] = page
                 info[info_id]['InfoArticle'] = i
                 info[info_id]['InfoUrl'] = info_url
-                info[info_id].update(self.get_info_from_article(article))
+                info[info_id].update(self.__get_info_from_article(article))
 
                 E = EmpireMovie(info, self.process_images)
                 new_movie = E.get_movie()
@@ -115,7 +117,7 @@ class EmpireMovies(object):
 
         return movies
 
-    def save_to_pickle(self):
+    def __save_to_pickle(self):
         file = f'{self.now}_empire_movies.pickle'
         with open(file, 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -134,11 +136,13 @@ class EmpireMovies(object):
         with open(file, 'rb') as f:
             return pickle.load(f)
 
-    def post_process_movies(self):
+    def __post_process_movies(self, export=True):
+        self.__teardown_log_files()
         self.df = pd.DataFrame.from_dict(self.movies, orient='index')
         self.df.index.name = 'ID'
-        self.save_to_pickle()
-        self.save_to_excel(self.df, file=None, now=self.now)
+        if export:
+            self.__save_to_pickle()
+            self.save_to_excel(self.df, file=None, now=self.now)
 
         # df['Essay'] = np.full((len(df), 1), False)
         #         # for tp in df.itertuples():
@@ -148,16 +152,19 @@ class EmpireMovies(object):
         #         #         df.loc[tp.Index, 'Movie'] = tp.Movie.split(pattern)[1]
         #         # df.to_excel('Empire.xlsx', index=False)
 
-    def teardown_log_files(self, pages):
+    def __teardown_log_files(self):
+        log_files = [f'empire_movies.{page}.log' for page in self.pages]
+        if self.export is False:
+            [os.remove(log_file) for log_file in log_files]
+            return
         self.now = datetime.strftime(datetime.now(), "%Y%m%d-%H%M%S")
         with open(f'{self.now}_empire_movies.log', 'w') as outfile:
-            log_files = [f'empire_movies.{page}.log' for page in pages]
             for log_file in log_files:
                 with open(log_file, 'r') as infile:
                     outfile.write(infile.read())
                 os.remove(log_file)
 
-    def get_movies_for_pages(self, pages=None, article_number=None):
+    def __get_movies_for_pages(self, pages=None, article_number=None):
 
         if isinstance(pages, int):
             pages = [pages]
@@ -165,22 +172,23 @@ class EmpireMovies(object):
             pages = list(pages)
         else:
             pass
+        self.pages = pages
         x = [(page, article_number) for page in pages]
 
         start = dt.now()
         with Pool(processes=self.number_of_processors) as pool:
-            movies = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
+            movies = pool.starmap(self._get_movies_for_page, iterable=iter(x), chunksize=1)
         [self.movies.update(res) for res in movies if res != -1]
         end = dt.now()
 
         scraping_time = str(end - start).split('.')[0]
         logger.info(f'Scraping time for {len(x)} pages: {scraping_time}')
-        self.teardown_log_files(pages)
 
     def get_df(self):
         return self.df
 
-    def get_movies(self, pages=None, article_number=None):
-        self.get_movies_for_pages(pages, article_number)
-        self.post_process_movies()
+    def get_movies(self, pages=None, article_number=None, export=True):
+        self.export = export
+        self.__get_movies_for_pages(pages, article_number)
+        self.__post_process_movies()
         return self.movies

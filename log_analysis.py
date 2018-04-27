@@ -1,10 +1,11 @@
 import pandas as pd
-from empire_scraper import EmpireMovies
+from empire_scraper import EmpireMovies, print_movies
 
 
 class LogAnalyzer(object):
     def __init__(self, file):
         self.file = file
+        self.now = file[:15]
         self.columns = ['asctime',
                         'filename',
                         'funcName',
@@ -31,7 +32,7 @@ class LogAnalyzer(object):
         solvable_error = [self.analyze_message(message)
                           for message in self.df_error[['message0', 'message1', 'message2']].values]
         self.df_error = self.df_error.assign(SolvableError=solvable_error)
-        self.df_error.to_excel('log_errors.xlsx', index=True)
+        self.df_error.to_excel('{self.now}_log_errors.xlsx', index=True)
 
     @staticmethod
     def analyze_message(message):
@@ -53,17 +54,16 @@ class LogAnalyzer(object):
         return df[df['InfoReviewUrl'].isin(solvable_movies)]
 
 
-def main():
-    now = '20180427-000119'
-    df = EmpireMovies.load_from_pickle(f'{now}_empire_movies.pickle').get_df()
+def main(file):
+    df = EmpireMovies.load_from_pickle(file).get_df()
     print(len(df))
-    file = f'{now}_empire_movies.log'
-    L = LogAnalyzer(file)
+    log_file = file.replace('pickle', 'log')
+    L = LogAnalyzer(log_file)
     df_solvable_movies = L.get_solvable_movies(df)
     for row in df_solvable_movies.itertuples():
-        E = EmpireMovies()
-        E.get_movies_for_page(row.InfoPage, row.InfoLocationOnPage)
+        E = EmpireMovies(process_images=False)
+        print_movies(E.get_movies(row.InfoPage, row.InfoArticle, export=False))
 
 
 if __name__ == '__main__':
-    main()
+    main(file=r'C:\Users\Sjoerd\PycharmProjects\Empire\20180427-000119_empire_movies.pickle')
