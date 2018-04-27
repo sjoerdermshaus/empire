@@ -12,7 +12,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
-def get_proxies(file = 'proxies.csv'):
+def get_proxies(file='proxies.csv'):
     df = pd.read_csv(file, sep=';')
     proxies = [{'http': f'http://{ip}'} for ip in df['ip']]
     return proxies
@@ -65,6 +65,7 @@ def print_movies(movies):
                         if movies2[title][key]['File'] is not None:
                             movies2[title][key]['File'] = str(movies2[title][key]['File'])
     print(json.dumps(movies2, sort_keys=True, indent=4))
+
 
 if __name__ == '__main__':
     print(random.choice(get_proxies()))

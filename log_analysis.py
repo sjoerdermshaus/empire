@@ -54,13 +54,14 @@ class LogAnalyzer(object):
 
 
 def main():
-    df = EmpireMovies.load_from_pickle().get_df()
+    now = '20180427-000119'
+    df = EmpireMovies.load_from_pickle(f'{now}_empire_movies.pickle').get_df()
     print(len(df))
-    file = 'empire_movies.log'
+    file = f'{now}_empire_movies.log'
     L = LogAnalyzer(file)
     df_solvable_movies = L.get_solvable_movies(df)
     for row in df_solvable_movies.itertuples():
-        E =  EmpireMovies()
+        E = EmpireMovies()
         E.get_movies_for_page(row.InfoPage, row.InfoLocationOnPage)
 
 

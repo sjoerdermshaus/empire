@@ -6,12 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-file = 'empire.yaml'
-logger = setup_logging(file)
+yaml = 'empire.yaml'
+logger = setup_logging(yaml)
 
 
 def test_movie(review_url):
-    info = {}
+    info = dict()
     info['InfoID'] = {}
     info['InfoID']['InfoPage'] = None
     info['InfoID']['Article'] = None
@@ -30,19 +30,17 @@ def test_page_article(page, article):
 
 
 def test_page(page):
-    E = EmpireMovies(process_images=True)
+    E = EmpireMovies(process_images=False)
     print_movies(E.get_movies(page))
 
 
 def test_pages(pages, number_of_processors=2):
-    E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
+    E = EmpireMovies(process_images=False, number_of_processors=number_of_processors)
     print_movies(E.get_movies(pages))
 
 
 def clean_df(df):
-
     df.loc[df['Movie'] == 'Nymphomaniac Volumes I And II', 'RunningTime'] = 122 + 123
-    #df.loc[df['Author'].isnull(), 'Rating'] = df.loc[df['Author'].isnull(), 'InfoRating']
     EmpireMovies.save_to_excel(df=df)
     return df
 
@@ -74,7 +72,6 @@ def test_results(file):
     df_worst_movies = df.query('Rating == 1')[['Movie', 'Author', 'Rating']]
     print('\nworst_movies\n')
     print(df_worst_movies)
-
 
     df_running_time = df[['Movie', 'Rating', 'RunningTime']].sort_values(by='RunningTime', ascending=False)
     print('\nRunningTime\n')

@@ -53,21 +53,21 @@ class EmpireMovies(object):
             rating = len(result.text.strip())
         return rating
 
-    def get_thumbnail_from_article(self, article):
+    @staticmethod
+    def get_thumbnail_from_article(article):
         thumbnail = None
-        if self.process_images:
-            result = article.find('img')
-            if result is not None:
-                thumbnail = dict()
-                thumbnail['Source'] = None
-                thumbnail['File'] = None
-                src = result['src']
-                if src is not None:
-                    thumbnail['Source'] = src
-                    if src.find('no-photo') == -1:
-                        response = requests.get(src)
-                        if response.status_code == 200:
-                            thumbnail['File'] = Image.open(BytesIO(response.content))
+        result = article.find('img')
+        if result is not None:
+            thumbnail = dict()
+            thumbnail['Source'] = None
+            thumbnail['File'] = None
+            src = result['src']
+            if src is not None:
+                thumbnail['Source'] = src
+                if src.find('no-photo') == -1:
+                    response = requests.get(src)
+                    if response.status_code == 200:
+                        thumbnail['File'] = Image.open(BytesIO(response.content))
         return thumbnail
 
     def get_info_from_article(self, article):
@@ -100,14 +100,14 @@ class EmpireMovies(object):
         movies = dict()
         for i, article in enumerate(articles, 1):
             if article_number is None or i == article_number:
-                id = f'{page:03d}-{i:02d}'
+                info_id = f'{page:03d}-{i:02d}'
                 info = dict()
-                info[id] = dict()
+                info[info_id] = dict()
                 # Process meta data
-                info[id]['InfoPage'] = page
-                info[id]['InfoArticle'] = i
-                info[id]['InfoUrl'] = info_url
-                info[id].update(self.get_info_from_article(article))
+                info[info_id]['InfoPage'] = page
+                info[info_id]['InfoArticle'] = i
+                info[info_id]['InfoUrl'] = info_url
+                info[info_id].update(self.get_info_from_article(article))
 
                 E = EmpireMovie(info, self.process_images)
                 new_movie = E.get_movie()
@@ -122,7 +122,7 @@ class EmpireMovies(object):
 
     @staticmethod
     def save_to_excel(df, file=None, now=None):
-        if file is None: # from object
+        if file is None:  # from object
             file = f'{now}_empire_movies.xlsx'
         labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(df.columns))
         df.drop(labels=labels, axis=1, inplace=True)
@@ -157,12 +157,14 @@ class EmpireMovies(object):
                     outfile.write(infile.read())
                 os.remove(log_file)
 
-
     def get_movies_for_pages(self, pages=None, article_number=None):
 
-        if isinstance(pages, int): pages = [pages]
-        elif not isinstance(pages, list): pages = list(pages)
-        else: pass
+        if isinstance(pages, int):
+            pages = [pages]
+        elif not isinstance(pages, list):
+            pages = list(pages)
+        else:
+            pass
         x = [(page, article_number) for page in pages]
 
         start = dt.now()
