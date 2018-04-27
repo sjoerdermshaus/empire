@@ -47,7 +47,7 @@ def requests_get(url, max_number_of_attempts=3, timeout=5, proxies=None):
                 logger.error(f'404|#{number_of_attempts}|{url}')
                 return -1
             else:
-                logger.error(f'StatusCode:{result.status_code}|#{number_of_attempts}|{url}')
+                logger.info(f'StatusCode:{result.status_code}|#{number_of_attempts}|{url}')
         except Exception as e:
             logger.info(f'{str(e)}|#{number_of_attempts}|{url}')
             time.sleep(1)

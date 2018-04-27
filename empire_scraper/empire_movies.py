@@ -30,6 +30,10 @@ class EmpireMovies(object):
         self.now = None
         self.pages = None
         self.export = None
+        self.log_file = None
+        self.pickle_file = None
+        self.result_file = None
+        self.error_file = None
 
     @staticmethod
     def __get_title_from_article(article):
@@ -118,31 +122,24 @@ class EmpireMovies(object):
         return movies
 
     def __save_to_pickle(self):
-        file = f'{self.now}_empire_movies.pickle'
-        with open(file, 'wb') as f:
+        logger.info('SaveToPickle')
+        self.pickle_file = f'{self.now}_empire_movies.pickle'
+        with open(self.pickle_file, 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    @staticmethod
-    def save_to_excel(df, file=None, now=None):
-        if file is None:  # from object
-            file = f'{now}_empire_movies.xlsx'
-        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(df.columns))
-        df.drop(labels=labels, axis=1, inplace=True)
-        with open(file, 'wb') as f:
-            df.to_excel(f, index=True)
+    def __save_to_excel(self):
+        logger.info('SaveToExcel')
+        self.result_file = f'{self.now}_empire_movies.xlsx'
+        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(self.df.columns))
+        self.df.drop(labels=labels, axis=1, inplace=True)
+        with open(self.result_file, 'wb') as f:
+            self.df.to_excel(f, index=True)
 
     @staticmethod
     def load_from_pickle(file):
         with open(file, 'rb') as f:
             return pickle.load(f)
 
-    def __post_process_movies(self, export=True):
-        self.__teardown_log_files()
-        self.df = pd.DataFrame.from_dict(self.movies, orient='index')
-        self.df.index.name = 'ID'
-        if export:
-            self.__save_to_pickle()
-            self.save_to_excel(self.df, file=None, now=self.now)
 
         # df['Essay'] = np.full((len(df), 1), False)
         #         # for tp in df.itertuples():
@@ -152,13 +149,15 @@ class EmpireMovies(object):
         #         #         df.loc[tp.Index, 'Movie'] = tp.Movie.split(pattern)[1]
         #         # df.to_excel('Empire.xlsx', index=False)
 
-    def __teardown_log_files(self):
+    def __create_one_log_file(self):
+        logger.info('CleaningLogFiles')
+        self.now = datetime.strftime(datetime.now(), "%Y%m%d-%H%M%S")
+        self.log_file = f'{self.now}_empire_movies.log'
         log_files = [f'empire_movies.{page}.log' for page in self.pages]
         if self.export is False:
             [os.remove(log_file) for log_file in log_files]
             return
-        self.now = datetime.strftime(datetime.now(), "%Y%m%d-%H%M%S")
-        with open(f'{self.now}_empire_movies.log', 'w') as outfile:
+        with open(self.log_file, 'w') as outfile:
             for log_file in log_files:
                 with open(log_file, 'r') as infile:
                     outfile.write(infile.read())
@@ -175,8 +174,13 @@ class EmpireMovies(object):
         self.pages = pages
         x = [(page, article_number) for page in pages]
 
+        if article_number is not None:
+            processes = 1
+        else:
+            processes = self.number_of_processors
+
         start = dt.now()
-        with Pool(processes=self.number_of_processors) as pool:
+        with Pool(processes=processes) as pool:
             movies = pool.starmap(self._get_movies_for_page, iterable=iter(x), chunksize=1)
         [self.movies.update(res) for res in movies if res != -1]
         end = dt.now()
@@ -187,8 +191,96 @@ class EmpireMovies(object):
     def get_df(self):
         return self.df
 
-    def get_movies(self, pages=None, article_number=None, export=True):
+    def __get_movies(self, pages=None, article_number=None, export=True):
         self.export = export
         self.__get_movies_for_pages(pages, article_number)
-        self.__post_process_movies()
+        self.__create_one_log_file()
+        self.df = pd.DataFrame.from_dict(self.movies, orient='index')
+        self.df.index.name = 'ID'
+        if self.export:
+            self.__save_to_pickle()
+            self.__save_to_excel()
         return self.movies
+
+    @staticmethod
+    def line_splitter(line):
+        return [i.strip() for i in line.split('|')]
+
+    @staticmethod
+    def analyze_error_message(message):
+        solvable_error = True
+        if message[2].split('/')[4].startswith('55'):
+            solvable_error = False
+        elif message[2].count('/') > 6:
+            solvable_error = False
+        elif message[0] == '404':
+            solvable_error = False
+        else:
+            pass
+        return solvable_error
+
+    @staticmethod
+    def get_solvable_movies_from_log_file(pickle_file):
+        E = EmpireMovies.load_from_pickle(pickle_file)
+
+        logger.info(f'AnalyzeLogFile')
+        columns = ['asctime',
+                   'filename',
+                   'funcName',
+                   'lineno',
+                   'levelname',
+                   'message0',
+                   'message1',
+                   'message2']
+
+        with open(E.log_file, 'r') as f:
+            lines = f.readlines()
+        lines = [E.line_splitter(line) for line in lines]
+        df_log_file = pd.DataFrame(data=lines, columns=columns)
+
+        # print(df_log_file.pivot_table(index=['levelname'], values=['message1'], aggfunc=[len], margins=True))
+        df_error = df_log_file.query('levelname == "ERROR"')
+        if len(df_error) == 0:
+            logger.info(f'NoErrorsFound')
+            return None
+
+        solvable_error = [E.analyze_error_message(message)
+                          for message in df_error[['message0', 'message1', 'message2']].values]
+        df_error = df_error.assign(SolvableError=solvable_error)
+        df_error.to_excel(E.error_file, index=True)
+
+        list_of_solvable_movies = list(df_error.query('SolvableError == True')['message2'].unique())
+        if len(list_of_solvable_movies) == 0:
+            logger.info(f'NoMoviesToBeSolved')
+            return None
+
+        df_solvable_movies = E.df[E.df['InfoReviewUrl'].isin(list_of_solvable_movies)]
+        solvable_movies = dict()
+        [solvable_movies.update({key: value}) for key, value in E.movies.items() if key in df_solvable_movies.index]
+        id_mismatch = False
+        for key, value in solvable_movies.items():
+            logger.info(f'GetReviewSolvableMovie|{key}|{value["InfoReviewUrl"]}')
+            updated_movie = E.__get_movies(value["InfoPage"], value["InfoArticle"], export=False)
+            # Check if 'Movie' is the same as 'InfoMovie'
+            # While looking for solvable movies, it might happen that because of a newly added review ID is outdated
+            if updated_movie[key]["InfoMovie"] != value["InfoMovie"]:
+                id_mismatch = True
+                logger.error(f'IDMismatch|{updated_movie[key]["InfoMovie"]}|{value["InfoMovie"]}')
+                break
+        if id_mismatch: # Reset to old value
+            for key, value in solvable_movies.items():
+                E.movies.update({key: value})
+        solvable_movies = dict()
+        [solvable_movies.update({key: value}) for key, value in E.movies.items() if key in df_solvable_movies.index]
+        return E
+
+    def get_movies(self, pages=None, article_number=None, export=True):
+        self.__get_movies(pages, article_number, export)
+        updated_E = self.get_solvable_movies_from_log_file(self.pickle_file)
+        if updated_E is not None:
+            logger.info(f'Saving updated data')
+            updated_E.__save_to_pickle()
+            updated_E.__save_to_excel()
+            return updated_E.movies
+        else:
+            return self.movies

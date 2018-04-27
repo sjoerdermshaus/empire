@@ -36,18 +36,24 @@ def test_page(page):
 
 def test_pages(pages, number_of_processors=2):
     E = EmpireMovies(process_images=False, number_of_processors=number_of_processors)
-    print_movies(E.get_movies(pages))
+    print_movies(E.get_movies(pages, export=True))
+
+def test_get_solvable_movies():
+    E = EmpireMovies.load_from_pickle('20180427-150903_empire_movies.pickle')
+    E.log_file = '20180427-150903_empire_movies.log'
+    E.error_file = '20180427-150903_empire_movies_errors.xlsx'
+    print_movies(E.get_solvable_movies_from_log_file())
 
 
-def clean_df(df):
-    df.loc[df['Movie'] == 'Nymphomaniac Volumes I And II', 'RunningTime'] = 122 + 123
-    EmpireMovies.save_to_excel(df=df)
-    return df
+#def clean_df(df):
+#    df.loc[df['Movie'] == 'Nymphomaniac Volumes I And II', 'RunningTime'] = 122 + 123
+#    EmpireMovies.__save_to_excel(df=df)
+#    return df
 
 
 def test_results(file):
     df = EmpireMovies.load_from_pickle(file).get_df()
-    df = clean_df(df)
+    #df = clean_df(df)
 
     rating = pd.pivot_table(data=df, index=['Rating'], values=['Movie'], aggfunc=len)
     rating.plot(kind='bar')
@@ -83,8 +89,12 @@ if __name__ == '__main__':
     # test_movie(review_url='https://www.empireonline.com/movies/mrs-browns-boys-dmovie/review/')
     # test_movie(review_url='https://www.empireonline.com/movies/us/review/')
     # test_movie(review_url='https://www.empireonline.com/movies/avengers-infinity-war/review/')
-    # test_page_article(1, 4)
-    # test_page_article(93, 1)
-    # test_pages(range(1))
-    test_pages(range(1, 501), 5)
+    #test_page_article(1, 4)
+   # test_page_article(229, 18)
+   # test_page_article(234, 3)
+    #test_page_article(276, 8)
+    # test_pages(234-03)
+    # test_pages(234-03)
+    test_pages(range(1, 100), 8)
     # test_results()
+    # test_get_solvable_movies()
