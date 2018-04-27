@@ -1,11 +1,12 @@
 from bs4 import BeautifulSoup
 import numpy as np
-from PIL import Image
+# from PIL import Image
 import requests
-from io import BytesIO
+# from io import BytesIO
 from empire_scraper.empire_helpers import requests_get, get_proxies
 import logging
 from datetime import datetime
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -141,7 +142,10 @@ class EmpireMovie(object):
                     if src.find('no-photo') == -1:
                         response = requests.get(src)
                         if response.status_code == 200:
-                            movie['Picture']['File'] = Image.open(BytesIO(response.content))
+                            # movie['Picture']['File'] = Image.open(BytesIO(response.content))
+                            out_file = os.path.join('pictures', src.split('/')[-1])
+                            with open(out_file, 'wb') as f:
+                                f.write(response.content)
 
     def get_review(self):
         logger.info(f'GetReview|{self.info_id}|{self.review_url}')

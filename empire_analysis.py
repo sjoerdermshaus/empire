@@ -35,15 +35,12 @@ def test_page(page):
 
 
 def test_pages(pages, number_of_processors=2):
-    E = EmpireMovies(process_images=False, number_of_processors=number_of_processors)
+    E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
     print_movies(E.get_movies(pages, export=True))
 
 def test_get_solvable_movies():
-    E = EmpireMovies.load_from_pickle('20180427-150903_empire_movies.pickle')
-    E.log_file = '20180427-150903_empire_movies.log'
-    E.error_file = '20180427-150903_empire_movies_errors.xlsx'
-    print_movies(E.get_solvable_movies_from_log_file())
-
+    _, movies = EmpireMovies.get_solvable_movies_from_log_file('20180427-154757_empire_movies.pickle')
+    print_movies(movies)
 
 #def clean_df(df):
 #    df.loc[df['Movie'] == 'Nymphomaniac Volumes I And II', 'RunningTime'] = 122 + 123
@@ -95,6 +92,6 @@ if __name__ == '__main__':
     #test_page_article(276, 8)
     # test_pages(234-03)
     # test_pages(234-03)
-    test_pages(range(1, 100), 8)
+    test_pages(range(51, 67), 8)
     # test_results()
-    # test_get_solvable_movies()
+    #test_get_solvable_movies()

@@ -12,6 +12,7 @@ from datetime import datetime as dt
 import os
 import logging
 from datetime import datetime
+import shutil
 
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,10 @@ class EmpireMovies(object):
         self.pickle_file = None
         self.result_file = None
         self.error_file = None
+        if not os.path.exists('thumbnails'):
+            os.makedirs('thumbnails')
+        if not os.path.exists('pictures'):
+            os.makedirs('pictures')
 
     @staticmethod
     def __get_title_from_article(article):
@@ -74,6 +79,9 @@ class EmpireMovies(object):
                     response = requests.get(src)
                     if response.status_code == 200:
                         thumbnail['File'] = Image.open(BytesIO(response.content))
+                        out_file = os.path.join('thumbnails', src.split('/')[-1])
+                        with open(out_file, 'wb') as f:
+                            f.write(response.content)
         return thumbnail
 
     def __get_info_from_article(self, article):
@@ -153,6 +161,7 @@ class EmpireMovies(object):
         logger.info('CleaningLogFiles')
         self.now = datetime.strftime(datetime.now(), "%Y%m%d-%H%M%S")
         self.log_file = f'{self.now}_empire_movies.log'
+        self.error_file = f'{self.now}_empire_movies_error.xlsx'
         log_files = [f'empire_movies.{page}.log' for page in self.pages]
         if self.export is False:
             [os.remove(log_file) for log_file in log_files]
@@ -222,7 +231,7 @@ class EmpireMovies(object):
     @staticmethod
     def get_solvable_movies_from_log_file(pickle_file):
         E = EmpireMovies.load_from_pickle(pickle_file)
-
+        #E.error_file = E.log_file.replace('.log', '_error.xlsx')
         logger.info(f'AnalyzeLogFile')
         columns = ['asctime',
                    'filename',
@@ -242,7 +251,7 @@ class EmpireMovies(object):
         df_error = df_log_file.query('levelname == "ERROR"')
         if len(df_error) == 0:
             logger.info(f'NoErrorsFound')
-            return None
+            return None, None
 
         solvable_error = [E.analyze_error_message(message)
                           for message in df_error[['message0', 'message1', 'message2']].values]
@@ -252,7 +261,7 @@ class EmpireMovies(object):
         list_of_solvable_movies = list(df_error.query('SolvableError == True')['message2'].unique())
         if len(list_of_solvable_movies) == 0:
             logger.info(f'NoMoviesToBeSolved')
-            return None
+            return None, None
 
         df_solvable_movies = E.df[E.df['InfoReviewUrl'].isin(list_of_solvable_movies)]
         solvable_movies = dict()
@@ -272,11 +281,11 @@ class EmpireMovies(object):
                 E.movies.update({key: value})
         solvable_movies = dict()
         [solvable_movies.update({key: value}) for key, value in E.movies.items() if key in df_solvable_movies.index]
-        return E
+        return E, solvable_movies
 
     def get_movies(self, pages=None, article_number=None, export=True):
         self.__get_movies(pages, article_number, export)
-        updated_E = self.get_solvable_movies_from_log_file(self.pickle_file)
+        updated_E, _ = self.get_solvable_movies_from_log_file(self.pickle_file)
         if updated_E is not None:
             logger.info(f'Saving updated data')
             updated_E.__save_to_pickle()
