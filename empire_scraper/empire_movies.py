@@ -34,12 +34,13 @@ class EmpireMovies(object):
         self.pickle_file = None
         self.result_file = None
         self.error_file = None
+        self.now = datetime.strftime(datetime.now(), "%Y%m%d-%H%M%S")
         if not os.path.exists('thumbnails'):
             os.makedirs('thumbnails')
         if not os.path.exists('pictures'):
             os.makedirs('pictures')
-        if not os.path.exists('results'):
-            os.makedirs('results')
+        if not os.path.exists(os.path.join('results', self.now)):
+            os.makedirs(os.path.join('results', self.now))
 
     @staticmethod
     def __get_title_from_article(article):
@@ -152,9 +153,6 @@ class EmpireMovies(object):
 
     def __create_one_log_file(self):
         logger.info('Cleaning up temporary log files')
-        self.now = datetime.strftime(datetime.now(), "%Y%m%d-%H%M%S")
-        if not os.path.exists(os.path.join('results', self.now)):
-            os.makedirs(os.path.join('results', self.now))
         self.log_file = os.path.join('results', self.now, f'{self.now}_empire_movies.log')
         self.error_file = os.path.join('results', self.now, f'{self.now}_empire_movies_error.xlsx')
         log_files = [f'empire_movies.{page}.log' for page in self.pages]
