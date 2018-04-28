@@ -134,7 +134,7 @@ class EmpireMovies(object):
 
     def __save_to_pickle(self):
         logger.info('Saving movies in pickle')
-        self.pickle_file = os.path.join('results', self.now, '{self.now}_empire_movies.pickle')
+        self.pickle_file = os.path.join('results', self.now, f'{self.now}_empire_movies.pickle')
         with open(self.pickle_file, 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
