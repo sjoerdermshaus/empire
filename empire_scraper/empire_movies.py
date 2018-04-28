@@ -293,11 +293,11 @@ class EmpireMovies(object):
 
         E.pickle_file = pickle_file
 
-        if id_mismatch: # Reset to old movies
+        if id_mismatch:  # Reset to old movies
             E.movies = movies
-        elif solvable_movies != {}:
+        elif solved_movies != {}:
             logger.info(f'Saving solved movies')
-            E.movies.update(solvable_movies)
+            E.movies.update(solved_movies)
             E.__save_to_pickle()
             E.__save_to_excel()
         else:
