@@ -92,6 +92,6 @@ if __name__ == '__main__':
     #test_page_article(276, 8)
     # test_pages(234-03)
     # test_pages(234-03)
-    test_pages(range(1, 500), 8)
+    test_pages(range(30, 50), 8)
     # test_results()
     #test_get_solvable_movies()
