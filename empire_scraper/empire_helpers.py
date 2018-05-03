@@ -16,17 +16,6 @@ def get_proxies(file='proxies.csv'):
     return proxies
 
 
-def setup_logging(file, filename=None):
-    with open(file, 'r') as f:
-        config = yaml.load(f.read())
-        if filename is not None:
-            config['handlers']['file']['filename'] = filename
-            config['handlers']['file']['mode'] = 'w'
-        dictConfig(config)
-    logger = logging.getLogger(__name__) if filename is None else logging.getLogger(filename)
-    return logger
-
-
 def requests_get(logger, url, max_number_of_attempts=3, timeout=5, proxies=None):
     number_of_attempts = 0
     # time.sleep(random.randint(1, 5))
@@ -67,37 +56,54 @@ def print_movies(movies):
     print(json.dumps(movies2, sort_keys=True, indent=4))
 
 
-def simple_logger(name=None, level=logging.INFO, propagate=True, mode='w', use_fh=True, use_ch=True):
-    if name is None:
-        name = 'root'
-        logger = logging.getLogger()
-    else:
-        logger = logging.getLogger(name)
-    logger.setLevel(level)
-    logger.propagate = propagate
+class MyHandler(object):
 
-    if use_fh is False and use_ch is False:
-        return logger
+    @staticmethod
+    def handle(record):
+        logger = logging.getLogger(record.name)
+        logger.handle(record)
 
-    fmt = '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s'
-    datefmt = '%Y-%m-%d %H:%M:%S'
-    fmt = logging.Formatter(fmt=fmt, datefmt=datefmt)
-    fh = logging.FileHandler(name + '.log', mode=mode)
-    ch = logging.StreamHandler(sys.stdout)
 
-    handlers =[]
-    if use_fh:
-        handlers.append(fh)
-    if use_ch:
-        handlers.append(ch)
-
-    if len(handlers) > 0:
-        for handler in handlers:
-            handler.setFormatter(fmt)
-            handler.setLevel(level)
-            logger.addHandler(handler)
-
-    return logger
+def listener_process(queue, stop_event):
+    config_listener = {
+        'version': 1,
+        'disable_existing_loggers': True,
+        'formatters': {
+            'detailed': {
+                'class': 'logging.Formatter',
+                'format': '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s',
+                'datefmt': '%Y-%m-%d %H:%M:%S',
+            },
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'level': 'INFO',
+                'formatter': 'detailed',
+                'stream': 'ext://sys.stdout',
+            },
+            'file': {
+                'class': 'logging.FileHandler',
+                'filename': 'empire_movies.log',
+                'mode': 'w',
+                'formatter': 'detailed',
+            },
+        },
+        'loggers': {
+            'foo': {
+                'handlers': ['file']
+            }
+        },
+        'root': {
+            'level': 'INFO',
+            'handlers': ['console', 'file']
+        },
+    }
+    logging.config.dictConfig(config_listener)
+    listener = logging.handlers.QueueListener(queue, MyHandler())
+    listener.start()
+    stop_event.wait()
+    listener.stop()
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@ import pickle
 from empire_scraper.empire_movie import EmpireMovie
 from empire_scraper.empire_helpers import get_proxies, print_movies
 from multiprocessing import Pool, Event
-from empire_scraper.empire_helpers import requests_get
+from empire_scraper.empire_helpers import requests_get, listener_process
 from datetime import datetime as dt
 import os
 from datetime import datetime
@@ -16,56 +16,6 @@ import logging
 import logging.config
 import logging.handlers
 import multiprocessing
-
-
-class MyHandler(object):
-
-    @staticmethod
-    def handle(record):
-        logger = logging.getLogger(record.name)
-        logger.handle(record)
-
-
-def listener_process(queue, stop_event):
-    config_listener = {
-        'version': 1,
-        'disable_existing_loggers': True,
-        'formatters': {
-            'detailed': {
-                'class': 'logging.Formatter',
-                'format': '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
-            },
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'level': 'INFO',
-                'formatter': 'detailed',
-                'stream': 'ext://sys.stdout',
-            },
-            'file': {
-                'class': 'logging.FileHandler',
-                'filename': 'mplog.log',
-                'mode': 'w',
-                'formatter': 'detailed',
-            },
-        },
-        'loggers': {
-            'foo': {
-                'handlers': ['file']
-            }
-        },
-        'root': {
-            'level': 'INFO',
-            'handlers': ['console', 'file']
-        },
-    }
-    logging.config.dictConfig(config_listener)
-    listener = logging.handlers.QueueListener(queue, MyHandler())
-    listener.start()
-    stop_event.wait()
-    listener.stop()
 
 
 class EmpireMovies(object):
@@ -146,7 +96,7 @@ class EmpireMovies(object):
         info['InfoThumbnail'] = self.__get_thumbnail_from_article(article)
         return info
 
-    def _get_movies_for_page(self, queue, page, article_number=None):
+    def get_movies_for_page(self, queue, page, article_number=None):
 
         config_worker = {
             'version': 1,
@@ -201,44 +151,11 @@ class EmpireMovies(object):
 
         return movies
 
-    def __save_to_pickle(self):
-        root_logger.info('Pickling movies||')
-        self.pickle_file = os.path.join('results', self.now, f'{self.now}_empire_movies.pickle')
-        with open(self.pickle_file, 'wb') as f:
-            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
+    def get_movies_for_pages(self, pages=None, article_number=None):
 
-    def __save_to_excel(self):
-        root_logger.info('Saving movies in Excel||')
-        self.result_file = os.path.join('results', self.now, f'{self.now}_empire_movies.xlsx')
-        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(self.df.columns))
-        self.df.drop(labels=labels, axis=1, inplace=True)
-        with open(self.result_file, 'wb') as f:
-            self.df.to_excel(f, index=True)
+        logger = logging.getLogger('root')
 
-    @staticmethod
-    def load_from_pickle(file):
-        with open(file, 'rb') as f:
-            return pickle.load(f)
-
-    def __create_one_log_file(self):
-        root_logger.info('Cleaning up temporary log files||')
-        self.log_file = os.path.join('results', self.now, f'{self.now}_empire_movies.log')
-        self.error_file = os.path.join('results', self.now, f'{self.now}_empire_movies_error.xlsx')
-        log_files = [f'empire_movies.{page}.log' for page in self.pages]
-        if self.export is False:
-            [os.remove(log_file) for log_file in log_files]
-            return
-        with open(self.log_file, 'w') as outfile:
-            for log_file in log_files:
-                with open(log_file, 'r') as infile:
-                    outfile.write(infile.read())
-                os.remove(log_file)
-
-    def __get_movies_for_pages(self, pages=None, article_number=None):
-
-        root_logger = logging.getLogger('root')
-
-        root_logger.info(f'Start scraping||')
+        logger.info(f'Start scraping||')
 
         manager = multiprocessing.Manager()
         queue = manager.Queue()
@@ -264,7 +181,7 @@ class EmpireMovies(object):
 
         start = dt.now()
         with Pool(processes=processes) as pool:
-            movies = pool.starmap(self._get_movies_for_page, iterable=iter(x), chunksize=1)
+            movies = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
         [self.movies.update(res) for res in movies if res != -1]
         end = dt.now()
 
@@ -272,14 +189,50 @@ class EmpireMovies(object):
         listener.join()
 
         scraping_time = str(end - start).split('.')[0]
-        root_logger.info(f'Scraping time for {len(x)} pages: {scraping_time}||')
+        logger.info(f'Scraping time for {len(x)} pages: {scraping_time}||')
+
+    def __save_to_pickle(self):
+        logger = logging.getLogger('root')
+        logger.info('Pickling movies||')
+        self.pickle_file = os.path.join('results', self.now, f'{self.now}_empire_movies.pickle')
+        with open(self.pickle_file, 'wb') as f:
+            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def __save_to_excel(self):
+        logger = logging.getLogger('root')
+        logger.info('Saving movies in Excel||')
+        self.result_file = os.path.join('results', self.now, f'{self.now}_empire_movies.xlsx')
+        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(self.df.columns))
+        self.df.drop(labels=labels, axis=1, inplace=True)
+        with open(self.result_file, 'wb') as f:
+            self.df.to_excel(f, index=True)
+
+    @staticmethod
+    def load_from_pickle(file):
+        with open(file, 'rb') as f:
+            return pickle.load(f)
+
+    def __create_one_log_file(self):
+        logger = logging.getLogger('root')
+        logger.info('Cleaning up temporary log files||')
+        self.log_file = os.path.join('results', self.now, f'{self.now}_empire_movies.log')
+        self.error_file = os.path.join('results', self.now, f'{self.now}_empire_movies_error.xlsx')
+        log_files = [f'empire_movies.{page}.log' for page in self.pages]
+        if self.export is False:
+            [os.remove(log_file) for log_file in log_files]
+            return
+        with open(self.log_file, 'w') as outfile:
+            for log_file in log_files:
+                with open(log_file, 'r') as infile:
+                    outfile.write(infile.read())
+                os.remove(log_file)
 
     def get_df(self):
         return self.df
 
     def __get_movies(self, pages=None, article_number=None, export=True):
         self.export = export
-        self.__get_movies_for_pages(pages, article_number)
+        self.get_movies_for_pages(pages, article_number)
         # self.__create_one_log_file()
         self.df = pd.DataFrame.from_dict(self.movies, orient='index')
         self.df.index.name = 'ID'
@@ -421,7 +374,7 @@ if __name__ == '__main__':
             'file': {
                 'class': 'logging.FileHandler',
                 'filename': 'root.log',
-                'mode': 'a',
+                'mode': 'w',
                 'formatter': 'detailed'
             }
         },
@@ -431,5 +384,5 @@ if __name__ == '__main__':
         },
     }
     logging.config.dictConfig(config_initial)
-    logger = logging.getLogger('root')
+    root_logger = logging.getLogger('root')
     test_pages(range(1, 6), 5)
