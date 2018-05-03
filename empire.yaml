@@ -8,6 +8,13 @@ handlers:
         formatter: simple
         filename: empire.log
         mode: w
+
+    file_multiprocessing:
+        class: logging.FileHandler
+        level: INFO
+        formatter: simple
+        filename: empire.log
+        mode: w
         
     console:
         class: logging.StreamHandler
@@ -24,9 +31,10 @@ formatters:
 root:
     level: NOTSET
     handlers: [file, console]
+    propagate: no
 
-#loggers:
-#    logging_aux:
-#        level: NOTSET
-#        handlers: [file_aux]
-#        propagate: yes # if yes, then the root settings are used in addition
+loggers:
+    empire_movies:
+        level: INFO
+        handlers: [file, console]
+        propagate: no

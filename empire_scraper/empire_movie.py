@@ -4,16 +4,13 @@ import numpy as np
 import requests
 # from io import BytesIO
 from empire_scraper.empire_helpers import requests_get, get_proxies
-import logging
 from datetime import datetime
 import os
 
 
-logger = logging.getLogger(__name__)
-
-
 class EmpireMovie(object):
-    def __init__(self, info=None, process_images=True, use_proxies=True):
+    def __init__(self, logger, info=None, process_images=True, use_proxies=True):
+        self.logger = logger
         self.info = info
         self.info_id = None
         self.info_movie = None
@@ -26,7 +23,7 @@ class EmpireMovie(object):
         self.parser = "lxml"
         self.soup = None
         if use_proxies:
-            self.proxies = get_proxies(file='empire_scraper/proxies.csv')
+            self.proxies = get_proxies(file='proxies.csv')
 
     def process_relevant_info(self):
         if self.info is not None:
@@ -39,9 +36,9 @@ class EmpireMovie(object):
             self.movie[self.info_id].update(self.info[self.info_id])
 
     def get_soup(self):
-        html = requests_get(self.review_url, max_number_of_attempts=3, timeout=5, proxies=self.proxies)
+        html = requests_get(self.logger, self.review_url, max_number_of_attempts=3, timeout=5, proxies=self.proxies)
         if html == -1:
-            logger.error(f'RequestsGetFailed|{self.info_id}|{self.review_url}')
+            self.logger.error(f'RequestsGetFailed|{self.info_id}|{self.review_url}')
             self.soup = None
         else:
             self.soup = BeautifulSoup(html, self.parser)
@@ -80,7 +77,7 @@ class EmpireMovie(object):
 
         result = self.soup.find("ul", class_="list__keyline delta txt--mid-grey")
         if result is None:
-            logger.info(f'NoInfoLeft|{self.info_id}|{self.review_url}')
+            self.logger.info(f'NoInfoLeft|{self.info_id}|{self.review_url}')
             return None
 
         result = result.get_text('|').split('|')
@@ -148,7 +145,7 @@ class EmpireMovie(object):
                                 f.write(response.content)
 
     def get_review(self):
-        logger.info(f'GetReview|{self.info_id}|{self.review_url}')
+        self.logger.info(f'GetReview|{self.info_id}|{self.review_url}')
         self.get_soup()
         if self.soup is None:
             return

@@ -1,13 +1,13 @@
 from empire_scraper import EmpireMovie, EmpireMovies
-from empire_scraper import print_movies, setup_logging
+from empire_scraper import print_movies, setup_logging, setup_logger
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-yaml = 'empire.yaml'
-logger = setup_logging(yaml)
+logger = setup_logging('empire.yaml', 'empire.log')
+#logger = setup_logger()
 
 
 def test_movie(review_url):
@@ -37,6 +37,7 @@ def test_page(page):
 def test_pages(pages, number_of_processors=2):
     E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
     print_movies(E.get_movies(pages, export=True))
+
 
 def test_get_solvable_movies():
     _, movies = EmpireMovies.get_solvable_movies_from_log_file('20180427-154757_empire_movies.pickle')
@@ -92,6 +93,9 @@ if __name__ == '__main__':
     #test_page_article(276, 8)
     # test_pages(234-03)
     # test_pages(234-03)
-    test_pages(range(1, 500), 8)
+    # test_pages(range(1, 500), 8)
     # test_results()
     #test_get_solvable_movies()
+    E = EmpireMovies.load_from_pickle(r'results\20180428-102941\20180428-102941_empire_movies.pickle')
+    E.logger = logger
+    movies = E.get_movies()
