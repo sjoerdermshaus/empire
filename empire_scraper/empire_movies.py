@@ -71,6 +71,11 @@ class EmpireMovies(object):
 
     @staticmethod
     def __get_rating_from_article(article):
+        """
+        Find the rating of the movie.
+        :param article: article about the movie in BeautifulSoup format
+        :return: rating of the movie (integer)
+        """
         rating = None
         result = article.find("span", class_="stars--on")
         if result is not None:
@@ -105,7 +110,7 @@ class EmpireMovies(object):
         info['InfoThumbnail'] = self.__get_thumbnail_from_article(article)
         return info
 
-    def get_movies_for_page(self, queue, page, article_number=None):
+    def get_movies_for_page(self, page, article_number=None, queue=None):
 
         config_worker = {
             'version': 1,
@@ -131,7 +136,7 @@ class EmpireMovies(object):
         html = requests_get(local_logger, info_url, max_number_of_attempts=3, timeout=5, proxies=self.proxies)
         if html == -1:
             local_logger.error(f'RequestFailed|{page}|{info_url}')
-            return -1
+            return None
         else:
             soup = BeautifulSoup(html, self.parser)
 
@@ -139,7 +144,7 @@ class EmpireMovies(object):
         articles = soup.find_all("article")
         if len(articles) == 0:
             local_logger.info(f'NonexistentPage|{page}|{info_url}')
-            return -1
+            return None
 
         # Loop over all articles
         movies = dict()
@@ -165,15 +170,6 @@ class EmpireMovies(object):
         logger = logging.getLogger('root')
         logger.info(f'Start scraping||')
 
-        # Start the listener process for multi-processing logging
-        manager = multiprocessing.Manager()
-        queue = manager.Queue()
-        stop_event = Event()
-        listener = multiprocessing.Process(target=listener_process,
-                                           name='listener',
-                                           args=(queue, stop_event))
-        listener.start()
-
         # Organize the pages and article numbers as input list for pool.starmap
         if isinstance(pages, int):
             pages = [pages]
@@ -182,22 +178,35 @@ class EmpireMovies(object):
         else:
             pass
         self.pages = pages
-        x = [(queue, page, article_number) for page in pages]
 
-        processes = 1 if article_number is not None else self.number_of_processors
-
-        # Start multi-processing all pages
+        # Start (multi-)processing all pages
         start = dt.now()
-        with Pool(processes=processes) as pool:
-            results = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
+
+        if len(pages) == 1 or self.number_of_processors == 1:
+            results = self.get_movies_for_page(pages, article_number)
+        else:
+            # Start the listener process for multi-processing logging
+            manager = multiprocessing.Manager()
+            queue = manager.Queue()
+            stop_event = Event()
+            listener = multiprocessing.Process(target=listener_process,
+                                               name='listener',
+                                               args=(queue, stop_event))
+            listener.start()
+
+            x = [(page, article_number, queue) for page in pages]
+            processes = self.number_of_processors
+            with Pool(processes=processes) as pool:
+                results = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
+
+            # Stop the listener
+            stop_event.set()
+            listener.join()
+
         end = dt.now()
 
         movies = dict()
-        [movies.update(result) for result in results if result != -1]
-
-        # Stop the listener
-        stop_event.set()
-        listener.join()
+        [movies.update(result) for result in results if result is not None]
 
         scraping_time = str(end - start).split('.')[0]
         logger.info(f'Scraping time for {len(x)} pages: {scraping_time}||')
@@ -274,7 +283,8 @@ class EmpireMovies(object):
         self.error_file = os.path.join('results', self.now, f'{self.now}_empire_movies_errors.xlsx')
         df_error.to_excel(self.error_file, index=True)
 
-        list_of_solvable_movies = list(df_error.query('SolvableError == True')['message2'].unique())
+        query = 'SolvableError == True and message0 == "RequestsGetFailed"'
+        list_of_solvable_movies = list(df_error.query(query)['message1'].unique())
         if len(list_of_solvable_movies) == 0:
             logger.info(f'No movies to be solved||')
             return None
@@ -319,7 +329,10 @@ class EmpireMovies(object):
 
 def test_pages(pages, number_of_processors=2):
     E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
-    print_movies(E.get_movies(pages))
+
+    #E = EmpireMovies.load_from_pickle(r'results/20180504-051543/20180504-051543_empire_movies.pickle')
+    movies = E.get_movies(pages)
+    print_movies(movies)
 
 
 if __name__ == '__main__':
