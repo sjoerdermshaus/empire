@@ -45,6 +45,8 @@ def requests_get(logger, url, max_number_of_attempts=3, timeout=5, proxies=None)
 
 
 def print_movies(movies):
+    if movies is None:
+        return dict()
     movies2 = movies.copy()
     for title in movies2:
         for key in ['InfoThumbnail', 'Picture']:

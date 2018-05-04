@@ -29,10 +29,8 @@ class EmpireMovies(object):
         self.proxies = None
         if use_proxies:
             self.proxies = get_proxies(file='proxies.csv')
-        self.now = None
         self.pages = None
-        self.export = None
-        self.log_file = None
+        self.log_file = 'empire_movies.log'
         self.pickle_file = None
         self.result_file = None
         self.error_file = None
@@ -191,9 +189,11 @@ class EmpireMovies(object):
         # Start multi-processing all pages
         start = dt.now()
         with Pool(processes=processes) as pool:
-            movies = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
-        [self.movies.update(res) for res in movies if res != -1]
+            results = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
         end = dt.now()
+
+        movies = dict()
+        [movies.update(result) for result in results if result != -1]
 
         # Stop the listener
         stop_event.set()
@@ -201,6 +201,7 @@ class EmpireMovies(object):
 
         scraping_time = str(end - start).split('.')[0]
         logger.info(f'Scraping time for {len(x)} pages: {scraping_time}||')
+        return movies
 
     def __save_to_pickle(self):
         logger = logging.getLogger('root')
@@ -243,10 +244,9 @@ class EmpireMovies(object):
             pass
         return solvable_error
 
-    @staticmethod
-    def get_solvable_movies_from_log_file(log_file, error_file, movies):
+    def get_solvable_movies_from_log_file(self):
         logger = logging.getLogger('root')
-        root_logger.info(f'Get solvable movies from log file||')
+        logger.info(f'Get solvable movies from log file||')
         columns = ['asctime',
                    'filename',
                    'funcName',
@@ -256,97 +256,70 @@ class EmpireMovies(object):
                    'message1',
                    'message2']
 
-        with open(log_file, 'r') as f:
+        with open(self.log_file, 'r') as f:
             lines = f.readlines()
-        lines = [EmpireMovies.line_splitter(line) for line in lines]
+        lines = [self.line_splitter(line) for line in lines]
         df_log_file = pd.DataFrame(data=lines, columns=columns)
 
         df_error = df_log_file.query('levelname == "ERROR"')
         if len(df_error) == 0:
-            root_logger.info(f'NoErrorsFound||')
+            logger.info(f'No errors found||')
             return None
 
         solvable_error = [EmpireMovies.analyze_error_message(message)
                           for message in df_error[['message0', 'message1', 'message2']].values]
         df_error = df_error.assign(SolvableError=solvable_error)
-        df_error.to_excel(error_file, index=True)
+
+        logger.info(f'Saving errors to Excel||')
+        self.error_file = os.path.join('results', self.now, f'{self.now}_empire_movies_errors.xlsx')
+        df_error.to_excel(self.error_file, index=True)
 
         list_of_solvable_movies = list(df_error.query('SolvableError == True')['message2'].unique())
         if len(list_of_solvable_movies) == 0:
-            root_logger.info(f'NoMoviesToBeSolved||')
+            logger.info(f'No movies to be solved||')
             return None
 
         solvable_movies = dict()
-        [solvable_movies.update({key: value}) for key, value in movies.items() if key in list_of_solvable_movies]
+        [solvable_movies.update({key: value}) for key, value in self.movies.items() if key in list_of_solvable_movies]
         return solvable_movies
 
-    @staticmethod
-    def solve_movies(pickle_file):
-        E = EmpireMovies.load_from_pickle(pickle_file)
+    def solve_movies(self):
+        logger = logging.getLogger('root')
 
-        # Save time stamped data
-        now = E.now
-        log_file = E.log_file
-        error_file = E.error_file
-        result_file = E.result_file
-
-        movies = E.movies
-
-        solvable_movies = EmpireMovies.get_solvable_movies_from_log_file(log_file, error_file, movies)
+        solvable_movies = self.get_solvable_movies_from_log_file()
         if solvable_movies is None:
-            return movies
+            logger.info(f'No movies to be solved||')
+            return None
 
-        id_mismatch = False
         solved_movies = dict()
         for key, value in solvable_movies.items():
-            root_logger.info(f'GetReviewSolvableMovie|{key}|{value["InfoReviewUrl"]}')
-            solved_movie = E.__get_movies(value["InfoPage"], value["InfoArticle"], export=False)
+            logger.info(f'GetReviewSolvableMovie|{key}|{value["InfoReviewUrl"]}')
+            solved_movie = self.get_movies_for_pages(value["InfoPage"], value["InfoArticle"])
             if solved_movie is not None:
                 if solved_movie[key]["InfoMovie"] != value["InfoMovie"]:
-                    id_mismatch = True
-                    root_logger.error(f'IDMismatch|{solved_movie[key]["InfoMovie"]}|{value["InfoMovie"]}')
-                    break
+                    logger.error(f'IDMismatch|{solved_movie[key]["InfoMovie"]}|{value["InfoMovie"]}')
+                    return None
                 else:
                     solved_movies.update(solved_movie)
 
-        E.now = now
-        E.log_file = log_file
-        E.error_file = error_file
-        E.result_file = result_file
+        return solved_movies
 
-        E.pickle_file = pickle_file
-
-        if id_mismatch:  # Reset to old movies
-            E.movies = movies
-        elif solved_movies != {}:
-            root_logger.info(f'Saving solved movies||')
-            E.movies.update(solved_movies)
-            E.__save_to_pickle()
-            E.__save_to_excel()
-        else:
-            pass
-
-        return E.movies
-
-    def get_movies(self, pages=None, article_number=None, export=True):
-        self.__get_movies(pages, article_number, export)
-        # self.solve_movies(self.pickle_file)
-        return self.movies
-
-    def __get_movies(self, pages=None, article_number=None, export=True):
-        self.export = export
-        self.get_movies_for_pages(pages, article_number)
+    def get_movies(self, pages=None, article_number=None):
+        movies = self.get_movies_for_pages(pages, article_number)
+        self.movies = movies
+        solved_movies = self.solve_movies()
+        if solved_movies is not None:
+            self.movies.update(solved_movies)
         self.df = pd.DataFrame.from_dict(self.movies, orient='index')
         self.df.index.name = 'ID'
-        if self.export:
-            self.__save_to_pickle()
-            self.__save_to_excel()
-        return self.movies
+        self.__save_to_pickle()
+        self.__save_to_excel()
+        return solved_movies
 
 
 def test_pages(pages, number_of_processors=2):
     E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
-    print_movies(E.get_movies(pages, export=True))
+    print_movies(E.get_movies(pages))
 
 
 if __name__ == '__main__':
@@ -383,4 +356,4 @@ if __name__ == '__main__':
         config_root = yaml.load(fh.read())
     dictConfig(config_root)
     root_logger = logging.getLogger('root')
-    test_pages(range(1, 6), 5)
+    test_pages(range(1, 501), 8)
