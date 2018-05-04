@@ -4,7 +4,7 @@ disable_existing_loggers: False
 formatters:
     simple:
         class: logging.Formatter
-        format: '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s'
+        format: '%(asctime)-20s|%(filename)-20s|%(funcName)-30s|%(lineno)-4s|%(levelname)-7s|%(message)s'
         datefmt: '%Y-%m-%d %H:%M:%S'
 
 handlers:

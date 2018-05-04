@@ -17,6 +17,7 @@ import multiprocessing
 
 from logging.config import dictConfig
 import yaml
+import shutil
 
 
 class EmpireMovies(object):
@@ -41,6 +42,9 @@ class EmpireMovies(object):
             os.makedirs('pictures')
         if not os.path.exists(os.path.join('results', self.now)):
             os.makedirs(os.path.join('results', self.now))
+
+        self.number_of_pages = 0
+        self.number_of_articles = 0
 
     @staticmethod
     def __get_title_from_article(article):
@@ -210,6 +214,7 @@ class EmpireMovies(object):
 
         scraping_time = str(end - start).split('.')[0]
         logger.info(f'Scraping time for {len(x)} pages: {scraping_time}||')
+
         return movies
 
     def __save_to_pickle(self):
@@ -253,7 +258,7 @@ class EmpireMovies(object):
             pass
         return solvable_error
 
-    def get_solvable_movies_from_log_file(self):
+    def get_solvable_movies_from_log(self):
         logger = logging.getLogger('root')
         logger.info(f'Get solvable movies from log file||')
         columns = ['asctime',
@@ -296,7 +301,7 @@ class EmpireMovies(object):
     def solve_movies(self):
         logger = logging.getLogger('root')
 
-        solvable_movies = self.get_solvable_movies_from_log_file()
+        solvable_movies = self.get_solvable_movies_from_log()
         if solvable_movies is None:
             logger.info(f'No movies to be solved||')
             return None
@@ -315,15 +320,27 @@ class EmpireMovies(object):
         return solved_movies
 
     def get_movies(self, pages=None, article_number=None):
+        logger = logging.getLogger('root')
+
+        logger.info('Get movies||')
         movies = self.get_movies_for_pages(pages, article_number)
         self.movies = movies
+
+        logger.info('Solve movies||')
         solved_movies = self.solve_movies()
         if solved_movies is not None:
             self.movies.update(solved_movies)
+
+        logger.info('Create DataFrame||')
         self.df = pd.DataFrame.from_dict(self.movies, orient='index')
         self.df.index.name = 'ID'
         self.__save_to_pickle()
         self.__save_to_excel()
+
+        logger.info('Copy log files||')
+        shutil.copyfile('root.log', f'results/{self.now}/{self.now}_root.log')
+        shutil.copyfile('empire_movies.log', f'results/{self.now}/{self.now}_empire_movies.log')
+
         return solved_movies
 
 
@@ -369,4 +386,4 @@ if __name__ == '__main__':
         config_root = yaml.load(fh.read())
     dictConfig(config_root)
     root_logger = logging.getLogger('root')
-    test_pages(range(1, 501), 8)
+    test_pages(range(1, 5), 8)

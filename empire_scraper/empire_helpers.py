@@ -39,7 +39,7 @@ def requests_get(logger, url, max_number_of_attempts=3, timeout=5, proxies=None)
                 logger.info(f'StatusCode:{result.status_code}|#{number_of_attempts}|{url}')
         except Exception as e:
             logger.info(f'{str(e)}|#{number_of_attempts}|{url}')
-            time.sleep(1)
+            time.sleep(5)
         logger.info(f'UnSuccessfulAttempt|#{number_of_attempts}|{url}')
     return -1
 
