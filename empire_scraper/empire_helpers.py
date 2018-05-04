@@ -4,9 +4,9 @@ import json
 import time
 import random
 import pandas as pd
-import sys
 
 from logging.config import dictConfig
+from logging.handlers import QueueListener
 import yaml
 
 
@@ -65,42 +65,43 @@ class MyHandler(object):
 
 
 def listener_process(queue, stop_event):
-    config_listener = {
-        'version': 1,
-        'disable_existing_loggers': True,
-        'formatters': {
-            'detailed': {
-                'class': 'logging.Formatter',
-                'format': '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
-            },
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'level': 'INFO',
-                'formatter': 'detailed',
-                'stream': 'ext://sys.stdout',
-            },
-            'file': {
-                'class': 'logging.FileHandler',
-                'filename': 'empire_movies.log',
-                'mode': 'w',
-                'formatter': 'detailed',
-            },
-        },
-        'loggers': {
-            'foo': {
-                'handlers': ['file']
-            }
-        },
-        'root': {
-            'level': 'INFO',
-            'handlers': ['console', 'file']
-        },
-    }
-    logging.config.dictConfig(config_listener)
-    listener = logging.handlers.QueueListener(queue, MyHandler())
+    # config_listener = {
+    #     'version': 1,
+    #     'disable_existing_loggers': True,
+    #     'formatters': {
+    #         'detailed': {
+    #             'class': 'logging.Formatter',
+    #             'format': '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s',
+    #             'datefmt': '%Y-%m-%d %H:%M:%S',
+    #         },
+    #     },
+    #     'handlers': {
+    #         'console': {
+    #             'class': 'logging.StreamHandler',
+    #             'level': 'INFO',
+    #             'formatter': 'detailed',
+    #             'stream': 'ext://sys.stdout',
+    #         },
+    #         'file': {
+    #             'class': 'logging.FileHandler',
+    #             'filename': 'empire_movies.log',
+    #             'mode': 'w',
+    #             'formatter': 'detailed',
+    #         },
+    #     },
+    #     'loggers': {
+    #         'foo': {
+    #             'handlers': ['file']
+    #         }
+    #     },
+    #     'root': {
+    #         'level': 'INFO',
+    #         'handlers': ['console', 'file']
+    #     },
+    with open('listener.yaml', 'r') as f:
+        config_listener = yaml.load(f.read())
+    dictConfig(config_listener)
+    listener = QueueListener(queue, MyHandler())
     listener.start()
     stop_event.wait()
     listener.stop()

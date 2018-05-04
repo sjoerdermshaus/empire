@@ -13,9 +13,10 @@ import os
 from datetime import datetime
 
 import logging
-import logging.config
-import logging.handlers
 import multiprocessing
+
+from logging.config import dictConfig
+import yaml
 
 
 class EmpireMovies(object):
@@ -45,6 +46,11 @@ class EmpireMovies(object):
 
     @staticmethod
     def __get_title_from_article(article):
+        """
+        Find the title of the movie and derive whether it is an essay.
+        :param article: article about the movie in BeautifulSoup format
+        :return: title (string) and a boolean, which indicates whether the movie is an essay
+        """
         title, is_essay = None, None
         result = article.find('p', class_='hdr no-marg gamma txt--black pad__top--half')
         if result is not None:
@@ -54,6 +60,11 @@ class EmpireMovies(object):
 
     @staticmethod
     def __get_review_url_from_article(article):
+        """
+        Find the URL of the review page of the movie.
+        :param article: article about the movie in BeautifulSoup format
+        :return: URL of the review page (string)
+        """
         review_url = None
         result = article.find('a')
         if result is not None:
@@ -112,7 +123,7 @@ class EmpireMovies(object):
                 'handlers': ['queue']
             },
         }
-        logging.config.dictConfig(config_worker)
+        dictConfig(config_worker)
 
         local_logger = logging.getLogger(f'sub_logger{page}')
 
@@ -154,9 +165,9 @@ class EmpireMovies(object):
     def get_movies_for_pages(self, pages=None, article_number=None):
 
         logger = logging.getLogger('root')
-
         logger.info(f'Start scraping||')
 
+        # Start the listener process for multi-processing logging
         manager = multiprocessing.Manager()
         queue = manager.Queue()
         stop_event = Event()
@@ -165,6 +176,7 @@ class EmpireMovies(object):
                                            args=(queue, stop_event))
         listener.start()
 
+        # Organize the pages and article numbers as input list for pool.starmap
         if isinstance(pages, int):
             pages = [pages]
         elif not isinstance(pages, list):
@@ -174,17 +186,16 @@ class EmpireMovies(object):
         self.pages = pages
         x = [(queue, page, article_number) for page in pages]
 
-        if article_number is not None:
-            processes = 1
-        else:
-            processes = self.number_of_processors
+        processes = 1 if article_number is not None else self.number_of_processors
 
+        # Start multi-processing all pages
         start = dt.now()
         with Pool(processes=processes) as pool:
             movies = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
         [self.movies.update(res) for res in movies if res != -1]
         end = dt.now()
 
+        # Stop the listener
         stop_event.set()
         listener.join()
 
@@ -212,34 +223,8 @@ class EmpireMovies(object):
         with open(file, 'rb') as f:
             return pickle.load(f)
 
-    def __create_one_log_file(self):
-        logger = logging.getLogger('root')
-        logger.info('Cleaning up temporary log files||')
-        self.log_file = os.path.join('results', self.now, f'{self.now}_empire_movies.log')
-        self.error_file = os.path.join('results', self.now, f'{self.now}_empire_movies_error.xlsx')
-        log_files = [f'empire_movies.{page}.log' for page in self.pages]
-        if self.export is False:
-            [os.remove(log_file) for log_file in log_files]
-            return
-        with open(self.log_file, 'w') as outfile:
-            for log_file in log_files:
-                with open(log_file, 'r') as infile:
-                    outfile.write(infile.read())
-                os.remove(log_file)
-
     def get_df(self):
         return self.df
-
-    def __get_movies(self, pages=None, article_number=None, export=True):
-        self.export = export
-        self.get_movies_for_pages(pages, article_number)
-        # self.__create_one_log_file()
-        self.df = pd.DataFrame.from_dict(self.movies, orient='index')
-        self.df.index.name = 'ID'
-        if self.export:
-            self.__save_to_pickle()
-            self.__save_to_excel()
-        return self.movies
 
     @staticmethod
     def line_splitter(line):
@@ -260,6 +245,7 @@ class EmpireMovies(object):
 
     @staticmethod
     def get_solvable_movies_from_log_file(log_file, error_file, movies):
+        logger = logging.getLogger('root')
         root_logger.info(f'Get solvable movies from log file||')
         columns = ['asctime',
                    'filename',
@@ -347,6 +333,16 @@ class EmpireMovies(object):
         # self.solve_movies(self.pickle_file)
         return self.movies
 
+    def __get_movies(self, pages=None, article_number=None, export=True):
+        self.export = export
+        self.get_movies_for_pages(pages, article_number)
+        self.df = pd.DataFrame.from_dict(self.movies, orient='index')
+        self.df.index.name = 'ID'
+        if self.export:
+            self.__save_to_pickle()
+            self.__save_to_excel()
+        return self.movies
+
 
 def test_pages(pages, number_of_processors=2):
     E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
@@ -354,35 +350,37 @@ def test_pages(pages, number_of_processors=2):
 
 
 if __name__ == '__main__':
-    config_initial = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {
-            'detailed': {
-                'class': 'logging.Formatter',
-                'format': '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
-            }
-        },
-        'handlers': {
-            'console': {
-                'class': 'logging.StreamHandler',
-                'level': 'INFO',
-                'formatter': 'detailed',
-                'stream': 'ext://sys.stdout'
-            },
-            'file': {
-                'class': 'logging.FileHandler',
-                'filename': 'root.log',
-                'mode': 'w',
-                'formatter': 'detailed'
-            }
-        },
-        'root': {
-            'level': 'INFO',
-            'handlers': ['console', 'file']
-        },
-    }
-    logging.config.dictConfig(config_initial)
+    # config_initial = {
+    #     'version': 1,
+    #     'disable_existing_loggers': False,
+    #     'formatters': {
+    #         'detailed': {
+    #             'class': 'logging.Formatter',
+    #             'format': '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s',
+    #             'datefmt': '%Y-%m-%d %H:%M:%S',
+    #         }
+    #     },
+    #     'handlers': {
+    #         'console': {
+    #             'class': 'logging.StreamHandler',
+    #             'level': 'INFO',
+    #             'formatter': 'detailed',
+    #             'stream': 'ext://sys.stdout'
+    #         },
+    #         'file': {
+    #             'class': 'logging.FileHandler',
+    #             'filename': 'root.log',
+    #             'mode': 'w',
+    #             'formatter': 'detailed'
+    #         }
+    #     },
+    #     'root': {
+    #         'level': 'INFO',
+    #         'handlers': ['console', 'file']
+    #     },
+    # }
+    with open('root.yaml', 'r') as fh:
+        config_root = yaml.load(fh.read())
+    dictConfig(config_root)
     root_logger = logging.getLogger('root')
     test_pages(range(1, 6), 5)

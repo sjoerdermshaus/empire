@@ -1,0 +1,31 @@
+version: 1
+disable_existing_loggers: True
+
+formatters:
+    simple:
+        class: logging.Formatter
+        format: '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s'
+        datefmt: '%Y-%m-%d %H:%M:%S'
+
+handlers:
+    console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: simple
+        stream: ext://sys.stdout
+
+    file:
+        class: logging.FileHandler
+        level: INFO
+        filename: empire_movies.log
+        mode: w
+        formatter: simple
+
+loggers:
+    foo:
+        level: INFO
+        handlers: [console, file]
+
+root:
+    level: INFO
+    handlers: [console, file]
