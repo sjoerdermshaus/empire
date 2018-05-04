@@ -217,14 +217,14 @@ class EmpireMovies(object):
 
         return movies
 
-    def __save_to_pickle(self):
+    def save_to_pickle(self):
         logger = logging.getLogger('root')
         logger.info('Pickling movies||')
         self.pickle_file = os.path.join('results', self.now, f'{self.now}_empire_movies.pickle')
         with open(self.pickle_file, 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def __save_to_excel(self):
+    def save_to_excel(self):
         logger = logging.getLogger('root')
         logger.info('Saving movies in Excel||')
         self.result_file = os.path.join('results', self.now, f'{self.now}_empire_movies.xlsx')
@@ -242,11 +242,11 @@ class EmpireMovies(object):
         return self.df
 
     @staticmethod
-    def line_splitter(line):
+    def __line_splitter(line):
         return [i.strip() for i in line.split('|')]
 
     @staticmethod
-    def analyze_error_message(message):
+    def __analyze_error_message(message):
         solvable_error = True
         if message[2].split('/')[4].startswith('55'):
             solvable_error = False
@@ -272,7 +272,7 @@ class EmpireMovies(object):
 
         with open(self.log_file, 'r') as f:
             lines = f.readlines()
-        lines = [self.line_splitter(line) for line in lines]
+        lines = [self.__line_splitter(line) for line in lines]
         df_log_file = pd.DataFrame(data=lines, columns=columns)
 
         df_error = df_log_file.query('levelname == "ERROR"')
@@ -280,7 +280,7 @@ class EmpireMovies(object):
             logger.info(f'No errors found||')
             return None
 
-        solvable_error = [EmpireMovies.analyze_error_message(message)
+        solvable_error = [EmpireMovies.__analyze_error_message(message)
                           for message in df_error[['message0', 'message1', 'message2']].values]
         df_error = df_error.assign(SolvableError=solvable_error)
 
@@ -316,7 +316,6 @@ class EmpireMovies(object):
                     return None
                 else:
                     solved_movies.update(solved_movie)
-
         return solved_movies
 
     def get_movies(self, pages=None, article_number=None):
@@ -334,8 +333,8 @@ class EmpireMovies(object):
         logger.info('Create DataFrame||')
         self.df = pd.DataFrame.from_dict(self.movies, orient='index')
         self.df.index.name = 'ID'
-        self.__save_to_pickle()
-        self.__save_to_excel()
+        self.save_to_pickle()
+        self.save_to_excel()
 
         logger.info('Copy log files||')
         shutil.copyfile('root.log', f'results/{self.now}/{self.now}_root.log')
@@ -346,44 +345,14 @@ class EmpireMovies(object):
 
 def test_pages(pages, number_of_processors=2):
     E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
-
-    #E = EmpireMovies.load_from_pickle(r'results/20180504-051543/20180504-051543_empire_movies.pickle')
+    # E = EmpireMovies.load_from_pickle(r'results/20180504-051543/20180504-051543_empire_movies.pickle')
     movies = E.get_movies(pages)
     print_movies(movies)
 
 
 if __name__ == '__main__':
-    # config_initial = {
-    #     'version': 1,
-    #     'disable_existing_loggers': False,
-    #     'formatters': {
-    #         'detailed': {
-    #             'class': 'logging.Formatter',
-    #             'format': '%(asctime)-20s|%(filename)-20s|%(funcName)-40s|%(lineno)-4s|%(levelname)-7s|%(message)s',
-    #             'datefmt': '%Y-%m-%d %H:%M:%S',
-    #         }
-    #     },
-    #     'handlers': {
-    #         'console': {
-    #             'class': 'logging.StreamHandler',
-    #             'level': 'INFO',
-    #             'formatter': 'detailed',
-    #             'stream': 'ext://sys.stdout'
-    #         },
-    #         'file': {
-    #             'class': 'logging.FileHandler',
-    #             'filename': 'root.log',
-    #             'mode': 'w',
-    #             'formatter': 'detailed'
-    #         }
-    #     },
-    #     'root': {
-    #         'level': 'INFO',
-    #         'handlers': ['console', 'file']
-    #     },
-    # }
     with open('root.yaml', 'r') as fh:
         config_root = yaml.load(fh.read())
     dictConfig(config_root)
     root_logger = logging.getLogger('root')
-    test_pages(range(1, 5), 8)
+    test_pages(range(1, 5), 500)
