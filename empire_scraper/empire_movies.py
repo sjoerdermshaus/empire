@@ -344,7 +344,7 @@ class EmpireMovies(object):
 
 
 def test_pages(pages, number_of_processors=2):
-    E = EmpireMovies(process_images=True, number_of_processors=number_of_processors)
+    E = EmpireMovies(process_images=True, number_of_processors=min(number_of_processors, 5))
     # E = EmpireMovies.load_from_pickle(r'results/20180504-051543/20180504-051543_empire_movies.pickle')
     movies = E.get_movies(pages)
     print_movies(movies)
@@ -355,4 +355,4 @@ if __name__ == '__main__':
         config_root = yaml.load(fh.read())
     dictConfig(config_root)
     root_logger = logging.getLogger('root')
-    test_pages(range(1, 5), 500)
+    test_pages(range(1, 500), 8)

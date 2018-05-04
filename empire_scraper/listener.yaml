@@ -21,11 +21,6 @@ handlers:
         mode: w
         formatter: simple
 
-loggers:
-    foo:
-        level: INFO
-        handlers: [console, file]
-
 root:
     level: INFO
     handlers: [console, file]
