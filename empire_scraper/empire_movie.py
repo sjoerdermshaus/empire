@@ -36,7 +36,7 @@ class EmpireMovie(object):
             self.movie[self.info_id].update(self.info[self.info_id])
 
     def get_soup(self):
-        html = requests_get(self.logger, self.review_url, max_number_of_attempts=3, timeout=5, proxies=self.proxies)
+        html = requests_get(self.logger, self.review_url, max_number_of_attempts=5, timeout=5, proxies=self.proxies)
         if html == -1:
             self.logger.error(f'RequestsGetFailed|{self.info_id}|{self.review_url}')
             self.soup = None

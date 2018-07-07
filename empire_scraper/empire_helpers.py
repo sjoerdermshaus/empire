@@ -16,9 +16,9 @@ def get_proxies(file='proxies.csv'):
     return proxies
 
 
-def requests_get(logger, url, max_number_of_attempts=3, timeout=5, proxies=None):
+def requests_get(logger, url, max_number_of_attempts=5, timeout=5, proxies=None):
     number_of_attempts = 0
-    # time.sleep(random.randint(1, 5))
+    time.sleep(random.randint(1, 3))
     while number_of_attempts < max_number_of_attempts:
         number_of_attempts += 1
         # noinspection PyBroadException
@@ -36,9 +36,11 @@ def requests_get(logger, url, max_number_of_attempts=3, timeout=5, proxies=None)
                     logger.info(f'SuccessfulAttempt|#{number_of_attempts}|{url}')
                 return result.content
             elif result.status_code == 404:
+                time.sleep(5)
                 logger.error(f'404|#{number_of_attempts}|{url}')
                 return -1
             else:
+                time.sleep(5)
                 logger.info(f'StatusCode:{result.status_code}|#{number_of_attempts}|{url}')
         except Exception as e:
             logger.info(f'{str(e)}|#{number_of_attempts}|{url}')

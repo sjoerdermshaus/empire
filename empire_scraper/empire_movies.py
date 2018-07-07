@@ -186,26 +186,26 @@ class EmpireMovies(object):
         # Start (multi-)processing all pages
         start = dt.now()
 
-        if len(pages) == 1 or self.number_of_processors == 1:
-            results = self.get_movies_for_page(pages, article_number)
-        else:
-            # Start the listener process for multi-processing logging
-            manager = multiprocessing.Manager()
-            queue = manager.Queue()
-            stop_event = Event()
-            listener = multiprocessing.Process(target=listener_process,
-                                               name='listener',
-                                               args=(queue, stop_event))
-            listener.start()
+        #if len(pages) == 1 or self.number_of_processors == 1:
+        #    results = self.get_movies_for_page(pages[0], article_number)
+        #else:
+        # Start the listener process for multi-processing logging
+        manager = multiprocessing.Manager()
+        queue = manager.Queue()
+        stop_event = Event()
+        listener = multiprocessing.Process(target=listener_process,
+                                           name='listener',
+                                           args=(queue, stop_event))
+        listener.start()
 
-            x = [(page, article_number, queue) for page in pages]
-            processes = self.number_of_processors
-            with Pool(processes=processes) as pool:
-                results = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
+        x = [(page, article_number, queue) for page in pages]
+        processes = self.number_of_processors
+        with Pool(processes=processes) as pool:
+            results = pool.starmap(self.get_movies_for_page, iterable=iter(x), chunksize=1)
 
-            # Stop the listener
-            stop_event.set()
-            listener.join()
+        # Stop the listener
+        stop_event.set()
+        listener.join()
 
         end = dt.now()
 
@@ -213,7 +213,7 @@ class EmpireMovies(object):
         [movies.update(result) for result in results if result is not None]
 
         scraping_time = str(end - start).split('.')[0]
-        logger.info(f'Scraping time for {len(x)} pages: {scraping_time}||')
+        logger.info(f'Scraping time for {len(pages)} pages: {scraping_time}||')
 
         return movies
 
@@ -306,17 +306,17 @@ class EmpireMovies(object):
             logger.info(f'No movies to be solved||')
             return None
 
-        solved_movies = dict()
-        for key, value in solvable_movies.items():
-            logger.info(f'GetReviewSolvableMovie|{key}|{value["InfoReviewUrl"]}')
-            solved_movie = self.get_movies_for_pages(value["InfoPage"], value["InfoArticle"])
-            if solved_movie is not None:
-                if solved_movie[key]["InfoMovie"] != value["InfoMovie"]:
-                    logger.error(f'IDMismatch|{solved_movie[key]["InfoMovie"]}|{value["InfoMovie"]}')
-                    return None
-                else:
-                    solved_movies.update(solved_movie)
-        return solved_movies
+        # solved_movies = dict()
+        # for key, value in solvable_movies.items():
+        #     logger.info(f'GetReviewSolvableMovie|{key}|{value["InfoReviewUrl"]}')
+        #     solved_movie = self.get_movies_for_pages(value["InfoPage"], value["InfoArticle"])
+        #     if solved_movie is not None:
+        #         if solved_movie[key]["InfoMovie"] != value["InfoMovie"]:
+        #             logger.error(f'IDMismatch|{solved_movie[key]["InfoMovie"]}|{value["InfoMovie"]}')
+        #             return None
+        #         else:
+        #             solved_movies.update(solved_movie)
+        #return solved_movies
 
     def get_movies(self, pages=None, article_number=None):
         logger = logging.getLogger('root')
@@ -327,8 +327,8 @@ class EmpireMovies(object):
 
         logger.info('Solve movies||')
         solved_movies = self.solve_movies()
-        if solved_movies is not None:
-            self.movies.update(solved_movies)
+        #if solved_movies is not None:
+        #    self.movies.update(solved_movies)
 
         logger.info('Create DataFrame||')
         self.df = pd.DataFrame.from_dict(self.movies, orient='index')
@@ -340,13 +340,14 @@ class EmpireMovies(object):
         shutil.copyfile('root.log', f'results/{self.now}/{self.now}_root.log')
         shutil.copyfile('empire_movies.log', f'results/{self.now}/{self.now}_empire_movies.log')
 
-        return solved_movies
+        #return solved_movies
 
 
 def test_pages(pages, number_of_processors=2):
     E = EmpireMovies(process_images=True, number_of_processors=min(number_of_processors, 5))
-    # E = EmpireMovies.load_from_pickle(r'results/20180504-051543/20180504-051543_empire_movies.pickle')
+    #E = EmpireMovies.load_from_pickle(r"C:\Users\Sjoerd\PycharmProjects\Empire\empire_scraper\results\20180629-101600\20180629-101600_empire_movies.pickle")
     movies = E.get_movies(pages)
+    #movies = E.get_movies_for_page(111, 22)
     print_movies(movies)
 
 
@@ -355,4 +356,4 @@ if __name__ == '__main__':
         config_root = yaml.load(fh.read())
     dictConfig(config_root)
     root_logger = logging.getLogger('root')
-    test_pages(range(1, 500), 8)
+    test_pages(range(1, 501), 5)
