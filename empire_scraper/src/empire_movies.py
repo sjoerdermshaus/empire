@@ -51,6 +51,8 @@ class EmpireMovies(object):
         self.number_of_pages = 0
         self.number_of_articles = 0
 
+        self.queue = None
+
     @staticmethod
     def __get_title_from_article(article):
         """
@@ -194,26 +196,10 @@ class EmpireMovies(object):
         # Start (multi-)processing all pages
         start = dt.now()
 
-        # if len(pages) == 1 or self.number_of_processors == 1:
-        #    results = self.get_movies_for_page(pages[0], article_number)
-        # else:
-        # Start the listener process for multi-processing logging
-        manager = multiprocessing.Manager()
-        queue = manager.Queue()
-        stop_event = Event()
-        listener = multiprocessing.Process(target=listener_process,
-                                           name='listener',
-                                           args=(queue, stop_event))
-        listener.start()
-
-        iterable = ((page, article_number, queue) for page, article_number in zip_longest(pages, article_numbers))
+        iterable = ((page, article_number, self.queue) for page, article_number in zip_longest(pages, article_numbers))
         processes = self.number_of_processors
         with Pool(processes=processes) as pool:
             results = pool.starmap(self.get_movies_for_page, iterable=iterable, chunksize=1)
-
-        # Stop the listener
-        stop_event.set()
-        listener.join()
 
         end = dt.now()
 
@@ -323,8 +309,8 @@ class EmpireMovies(object):
         if solvable_movies == {}:
             logger.info(f'No solvable movies found||')
             return {}, non_solvable_movies
-        else:
-            logger.info(f'Solvable movies found||')
+
+        logger.info(f'Scraping solvable movies||')
 
         solved_movies = dict()
         for key, value in solvable_movies.items():
@@ -356,6 +342,15 @@ class EmpireMovies(object):
 
         # Get movies for the requested pages
         logger.info('Get movies||')
+
+        manager = multiprocessing.Manager()
+        self.queue = manager.Queue()
+        stop_event = Event()
+        listener = multiprocessing.Process(target=listener_process,
+                                                name='listener',
+                                                args=(self.queue, stop_event))
+        listener.start()
+
         self.movies = self.get_movies_for_pages(pages, article_numbers)
 
         # Analyze the log file and try to scrape movies which haven't been scraped yet
@@ -376,6 +371,10 @@ class EmpireMovies(object):
         self.df.index.name = 'ID'
         self.save_to_pickle()
         self.save_to_excel()
+
+        # Stop the listener
+        stop_event.set()
+        listener.join()
 
         # Finally, copy log files to the results folder
         logger.info('Copy log files||')
