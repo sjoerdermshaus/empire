@@ -211,21 +211,28 @@ class EmpireMovies(object):
 
         return movies
 
-    def save_to_pickle(self):
+    def save_to_pickle(self, filename='empire_movies'):
         logger = logging.getLogger('root')
-        logger.info('Pickling movies||')
-        self.pickle_file = os.path.join('results', self.now, f'{self.now}_empire_movies.pickle')
+        logger.info(f'Pickling {len(self.movies)} movies||')
+        self.pickle_file = os.path.join('results', self.now, f'{self.now}_{filename}.pickle')
         with open(self.pickle_file, 'wb') as f:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def save_to_excel(self):
+    def save_to_excel(self, movies, filename='empire_movies'):
+        df = self.create_df(movies)
         logger = logging.getLogger('root')
-        logger.info('Saving movies in Excel||')
-        self.result_file = os.path.join('results', self.now, f'{self.now}_empire_movies.xlsx')
-        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(self.df.columns))
-        self.df.drop(labels=labels, axis=1, inplace=True)
-        with open(self.result_file, 'wb') as f:
-            self.df.to_excel(f, index=True)
+        logger.info(f'Saving {len(df)} movies in Excel||')
+        result_file = os.path.join('results', self.now, f'{self.now}_{filename}.xlsx')
+        labels = list({'InfoThumbnail', 'Picture', 'Introduction', 'Review'} & set(df.columns))
+        df.drop(labels=labels, axis=1, inplace=True)
+        with open(result_file, 'wb') as f:
+            df.to_excel(f, index=True)
+
+    @staticmethod
+    def create_df(movies):
+        df = pd.DataFrame.from_dict(movies, orient='index')
+        df.index.name = 'ID'
+        return df
 
     @staticmethod
     def load_from_pickle(file):
@@ -274,7 +281,7 @@ class EmpireMovies(object):
             logger.info(f'No errors found in log file||')
             return {}, {}
 
-        logger.info(f'Errors found in log file||')
+        logger.info(f'{len(df_error)} errors found in log file||')
 
         solvable_error = [EmpireMovies.__analyze_error_message(message)
                           for message in df_error[['message0', 'message1', 'message2']].values]
@@ -289,7 +296,7 @@ class EmpireMovies(object):
         if len(list_of_solvable_movies) == 0:
             logger.info(f'Errors found in log file but no movies to be solved||')
         else:
-            logger.info(f'Errors found in log file and movies to be solved||')
+            logger.info(f'Errors found in log file and {len(list_of_solvable_movies)} movies to be solved||')
 
         query = 'message0 == "RequestsGetFailed"'
         list_of_movies = list(df_error.query(query)['message1'].unique())
@@ -310,7 +317,7 @@ class EmpireMovies(object):
             logger.info(f'No solvable movies found||')
             return {}, non_solvable_movies
 
-        logger.info(f'Scraping solvable movies||')
+        logger.info(f'Scraping {len(solvable_movies)} solvable movies||')
 
         solved_movies = dict()
         for key, value in solvable_movies.items():
@@ -340,39 +347,43 @@ class EmpireMovies(object):
         """
         logger = logging.getLogger('root')
 
-        # Get movies for the requested pages
-        logger.info('Get movies||')
-
+        # Setup multiprocessing logger
         manager = multiprocessing.Manager()
         self.queue = manager.Queue()
         stop_event = Event()
         listener = multiprocessing.Process(target=listener_process,
-                                                name='listener',
-                                                args=(self.queue, stop_event))
+                                           name='listener',
+                                           args=(self.queue, stop_event))
         listener.start()
 
-        self.movies = self.get_movies_for_pages(pages, article_numbers)
+        # Get movies for the requested pages
+        logger.info('Get movies||')
 
-        # Analyze the log file and try to scrape movies which haven't been scraped yet
-        logger.info('Solving movies (if any)||')
+        self.movies = self.get_movies_for_pages(pages, article_numbers)
+        s = f'{len(self.movies)} movies scraped||'
+        logger.info('-' * (len(s) - 2) + '||')
+        logger.info(s)
+        logger.info('-' * (len(s) - 2) + '||')
+
+        # Analyze the log file and try to scrape movies which haven't been scraped yet (solve movies)
+        logger.info(f'Solving movies (if any)||')
         solved_movies, non_solvable_movies = self.solve_movies()
         if solved_movies != {}:
-            logger.info('Adding solved movies||')
+            logger.info(f'Updating {len(solved_movies)} solved movies||')
             self.movies.update(solved_movies)
+            self.save_to_excel(solved_movies, filename='solved_movies')
 
         # Remove non solvable movies from the final list
         if non_solvable_movies != {}:
-            logger.info('Removing non solvable movies||')
+            logger.info(f'Removing {len(non_solvable_movies)} non solvable movies||')
             [self.movies.pop(key) for key in non_solvable_movies.keys()]
+            self.save_to_excel(non_solvable_movies, filename='unsolved_movies')
 
         # Create a DataFrame from the movies and export it to Excel
-        logger.info('Create DataFrame||')
-        self.df = pd.DataFrame.from_dict(self.movies, orient='index')
-        self.df.index.name = 'ID'
         self.save_to_pickle()
-        self.save_to_excel()
+        self.save_to_excel(self.movies, filename='movies')
 
-        # Stop the listener
+        # Teardown multiprocessing logger
         stop_event.set()
         listener.join()
 
